@@ -10,10 +10,20 @@ import uuid
 from typing import Optional, Dict
 import logging
 import re
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Validate API key
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise ValueError("GOOGLE_API_KEY is not set in environment variables")
 
 app = FastAPI()
 
@@ -26,6 +36,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add error handling middleware
+@app.exception_handler(Exception)
+async def exception_handler(request, exc):
+    logger.error(f"An error occurred: {str(exc)}")
+    return JSONResponse(
+        status_code=500,
+        content={"error": "An internal error occurred"},
+    )
+
 # Model for user input
 class QuestionRequest(BaseModel):
     question: str
@@ -37,7 +56,7 @@ conversation_histories: Dict[str, InMemoryChatMessageHistory] = {}
 # Initialize the LangChain LLM with Gemini
 llm = ChatGoogleGenerativeAI(
     model="gemini-1.5-flash",
-    google_api_key="AIzaSyBRQpaWo267nyVCSZ7T4GxDfG6zXDOWBAg"
+    google_api_key=GOOGLE_API_KEY
 )
 
 # Define the prompt template
@@ -58,9 +77,17 @@ chain_with_history = RunnableWithMessageHistory(
     history_messages_key="chat_history"
 )
 
+@app.get("/")
+async def root():
+    return {"message": "Welcome to the AI-powered Personal Assistant!"}
+
 @app.post("/ask-ai/")
 async def ask_ai(request: QuestionRequest):
     try:
+        # Validate request
+        if not request.question:
+            raise HTTPException(status_code=400, detail="Question is required")
+
         # Log received conversation_id
         logger.info(f"Received conversation_id: {request.conversation_id}")
         
