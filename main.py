@@ -13,11 +13,27 @@ import logging
 import re
 import os
 from dotenv import load_dotenv
+import asyncio
+from fastapi.responses import JSONResponse
 
 # Load environment variables
 load_dotenv()
 
 # Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Initialize FastAPI app with async support
+app = FastAPI()
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -118,6 +134,13 @@ async def ask_ai(request: QuestionRequest):
         if has_pronoun and not request.conversation_id and not chat_history:
             warning = "Warning: Pronoun detected ('he', 'she', 'it', or 'they') but no conversation_id provided. Please use the conversation_id from the previous response to maintain context."
         
+        # Create a new event loop if needed
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
         # Invoke the chain with history
         response = await chain_with_history.ainvoke(
             {"question": request.question},
@@ -144,7 +167,7 @@ async def ask_ai(request: QuestionRequest):
         if warning:
             response_data["warning"] = warning
         
-        return response_data
+        return JSONResponse(content=response_data)
         
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
