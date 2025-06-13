@@ -8,7 +8,8 @@
     ],
     "routes": [
     {
-      "src": "main.py",
+      "src": "/(.*)",
+      "dest": "main.py",
       "methods": ["POST", "OPTIONS"],
       "headers": {
         "Access-Control-Allow-Origin": "http://localhost:3000",
