@@ -12,10 +12,18 @@
             "dest": "main.py",
             "methods": ["GET", "POST", "OPTIONS", "PUT", "DELETE", "PATCH"]
         }
+    ],
+    "headers": [
+        {
+            "src": "/(.*)",
+            "headers": [
+                {
+                    "Access-Control-Allow-Origin": "http://localhost:3000",
+                    "Access-Control-Allow-Methods": "POST, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type",
+                    "Access-Control-Allow-Credentials": "true"
+                }
+            ]
+        }
     ]
 }
-
-
-
-
-
