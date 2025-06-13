@@ -1,66 +1,80 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_google_genai import ChatGoogleGenerativeAI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from langchain_core.messages import HumanMessage, AIMessage
-from langchain_core.chat_history import InMemoryChatMessageHistory
-from langchain_core.runnables.history import RunnableWithMessageHistory
-import uuid
-from typing import Optional, Dict
 import logging
-import re
 import os
 from dotenv import load_dotenv
+import uuid
+import re
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.chat_history import InMemoryChatMessageHistory
+from langchain_core.runnables.history import RunnableWithMessageHistory
 import asyncio
-from fastapi.responses import JSONResponse
-
-# Load environment variables
-load_dotenv()
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app with async support
+# Load environment variables
+load_dotenv()
+
+# Initialize FastAPI app
 app = FastAPI()
 
-# Configure CORS with specific origins
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://chatbot-website-frontend.vercel.app"],
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD", "CONNECT", "TRACE"],
-    allow_headers=["Content-Type", "application/json"],
-    expose_headers=["Content-Length", "X-Foo", "X-Bar"],
+    allow_methods=["POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
 
+# Log all requests and responses
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.info(f"Request: {request.method} {request.url} from {request.headers.get('origin')}")
+    try:
+        response = await call_next(request)
+        logger.info(f"Response: {response.status_code} for {request.method} {request.url}")
+        logger.info(f"Response headers: {response.headers}")
+        return response
+    except Exception as e:
+        logger.error(f"Middleware error: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal server error"},
+            headers={
+                "Access-Control-Allow-Origin": "http://localhost:3000",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type",
+                "Access-Control-Allow-Credentials": "true",
+            }
+        )
+
+# Verify environment variable
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+logger.info(f"GOOGLE_API_KEY: {'set' if GOOGLE_API_KEY else 'not set'}")
 if not GOOGLE_API_KEY:
     raise ValueError("GOOGLE_API_KEY is not set in environment variables")
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Initialize chat history
+conversation_histories = {}
 
-@app.exception_handler(Exception)
-async def exception_handler(request, exc):
-    logger.error(f"An error occurred: {str(exc)}")
-    return JSONResponse(
-        status_code=500,
-        content={"error": "An internal error occurred"},
+# Initialize LangChain components
+try:
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-1.5-flash",
+        google_api_key=GOOGLE_API_KEY
     )
+    logger.info("LangChain initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize LangChain: {str(e)}")
+    raise
 
-class QuestionRequest(BaseModel):
-    question: str
-    conversation_id: Optional[str] = None
-conversation_histories: Dict[str, InMemoryChatMessageHistory] = {}
-
-llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash",
-    google_api_key=GOOGLE_API_KEY
-)
 prompt_template = ChatPromptTemplate.from_messages([
-    ("system", """You are a helpful AI assistant. Use the conversation history to maintain context and answer questions accurately. Pay special attention to pronouns like 'he', 'she', 'it', or 'they', and refer to the history to resolve them. If a pronoun is ambiguous and no context is available, ask for clarification but try to infer based on context first."""),
+    ("system", """You are a helpful AI assistant."""),
     MessagesPlaceholder(variable_name="chat_history"),
     ("human", "{question}")
 ])
@@ -76,33 +90,54 @@ chain_with_history = RunnableWithMessageHistory(
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the AI-powered Personal Assistant!"}
+    return JSONResponse(
+        content={"message": "Welcome to the AI-powered Personal Assistant!"},
+        headers={
+            "Access-Control-Allow-Origin": "http://localhost:3000",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Allow-Credentials": "true",
+        }
+    )
 
 @app.post("/ask-ai/")
-async def ask_ai(request: QuestionRequest):
+async def ask_ai(request: Request):
+    logger.info("Received POST request to /ask-ai")
     try:
-        if not request.question:
-            raise HTTPException(status_code=400, detail="Question is required")
+        data = await request.json()
+        logger.info(f"Request body: {data}")
+        question = data.get("question")
+        conversation_id = data.get("conversation_id")
 
-        logger.info(f"Received conversation_id: {request.conversation_id}")
+        if not question:
+            logger.error("Question is required")
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Question is required"},
+                headers={
+                    "Access-Control-Allow-Origin": "http://localhost:3000",
+                    "Access-Control-Allow-Methods": "POST, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type",
+                    "Access-Control-Allow-Credentials": "true",
+                }
+            )
+
+        logger.info(f"Received question: {question}, conversation_id: {conversation_id}")
         
-        conversation_id = request.conversation_id or str(uuid.uuid4())
-        logger.info(f"Using conversation_id: {conversation_id}")
-        
+        conversation_id = conversation_id or str(uuid.uuid4())
         if conversation_id not in conversation_histories:
             conversation_histories[conversation_id] = InMemoryChatMessageHistory()
             logger.info(f"Initialized new history for conversation_id: {conversation_id}")
         
         chat_history = conversation_histories[conversation_id].messages
         logger.info(f"Current chat history: {[msg.content for msg in chat_history]}")
-        logger.info(f"New question: {request.question}")
         
         pronoun_pattern = re.compile(r'\b(he|she|it|they)\b', re.IGNORECASE)
-        has_pronoun = bool(pronoun_pattern.search(request.question))
+        has_pronoun = bool(pronoun_pattern.search(question))
         
         warning = None
-        if has_pronoun and not request.conversation_id and not chat_history:
-            warning = "Warning: Pronoun detected ('he', 'she', 'it', or 'they') but no conversation_id provided. Please use the conversation_id from the previous response to maintain context."
+        if has_pronoun and not conversation_id and not chat_history:
+            warning = "Warning: Pronoun detected but no conversation_id provided."
         
         try:
             loop = asyncio.get_running_loop()
@@ -111,7 +146,7 @@ async def ask_ai(request: QuestionRequest):
             asyncio.set_event_loop(loop)
         
         response = await chain_with_history.ainvoke(
-            {"question": request.question},
+            {"question": question},
             config={"configurable": {"session_id": conversation_id}}
         )
         
@@ -121,9 +156,6 @@ async def ask_ai(request: QuestionRequest):
             conversation_histories[conversation_id].messages = chat_history[-6:]
             logger.info(f"Trimmed history to last 6 messages for conversation_id: {conversation_id}")
         
-        updated_history = conversation_histories[conversation_id].messages
-        logger.info(f"Updated chat history: {[msg.content for msg in updated_history]}")
-        
         response_data = {
             "response": response.content,
             "conversation_id": conversation_id
@@ -131,8 +163,25 @@ async def ask_ai(request: QuestionRequest):
         if warning:
             response_data["warning"] = warning
         
-        return JSONResponse(content=response_data)
+        return JSONResponse(
+            content=response_data,
+            headers={
+                "Access-Control-Allow-Origin": "http://localhost:3000",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type",
+                "Access-Control-Allow-Credentials": "true",
+            }
+        )
         
     except Exception as e:
-        logger.error(f"Error processing request: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error processing POST request: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)},
+            headers={
+                "Access-Control-Allow-Origin": "http://localhost:3000",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type",
+                "Access-Control-Allow-Credentials": "true",
+            }
+        )
