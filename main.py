@@ -26,16 +26,15 @@ logger = logging.getLogger(__name__)
 # Initialize FastAPI app with async support
 app = FastAPI()
 
-# Configure CORS
+# Configure CORS with specific origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000", "https://chatbot-website-frontend.vercel.app"],  # Add your frontend domain here
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+    expose_headers=["Content-Length", "X-Foo", "X-Bar"],
 )
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Validate API key
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
