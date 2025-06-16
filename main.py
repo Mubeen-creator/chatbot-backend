@@ -14,7 +14,7 @@ import asyncio
 import traceback
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)  # Change to DEBUG for more visibility
 logger = logging.getLogger(__name__)
 
 # Load environment variables
@@ -32,14 +32,13 @@ app.add_middleware(
     allow_headers=["Content-Type"],
 )
 
-# Log all requests and responses
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    logger.info(f"Request: {request.method} {request.url} from {request.headers.get('origin')}")
+    logger.debug(f"Request: {request.method} {request.url} from {request.headers.get('origin')}")
     try:
         response = await call_next(request)
-        logger.info(f"Response: {response.status_code} for {request.method} {request.url}")
-        logger.info(f"Response headers: {response.headers}")
+        logger.debug(f"Response: {response.status_code} for {request.method} {request.url}")
+        logger.debug(f"Response headers: {response.headers}")
         return response
     except Exception as e:
         logger.error(f"Middleware error: {str(e)}\n{traceback.format_exc()}")
@@ -103,10 +102,10 @@ async def root():
 
 @app.post("/ask-ai/")
 async def ask_ai(request: Request):
-    logger.info("Received POST request to /ask-ai")
+    logger.debug("Received POST request to /ask-ai")
     try:
         data = await request.json()
-        logger.info(f"Request body: {data}")
+        logger.debug(f"Request body: {data}")
         question = data.get("question")
         conversation_id = data.get("conversation_id")
 
@@ -115,18 +114,23 @@ async def ask_ai(request: Request):
             return JSONResponse(
                 status_code=400,
                 content={"error": "Question is required"},
-                headers={...}
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "POST, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type",
+                    "Access-Control-Allow-Credentials": "true",
+                }
             )
 
-        logger.info(f"Received question: {question}, conversation_id: {conversation_id}")
+        logger.debug(f"Received question: {question}, conversation_id: {conversation_id}")
         
         conversation_id = conversation_id or str(uuid.uuid4())
         if conversation_id not in conversation_histories:
             conversation_histories[conversation_id] = InMemoryChatMessageHistory()
-            logger.info(f"Initialized new history for conversation_id: {conversation_id}")
+            logger.debug(f"Initialized new history for conversation_id: {conversation_id}")
         
         chat_history = conversation_histories[conversation_id].messages
-        logger.info(f"Current chat history: {[msg.content for msg in chat_history]}")
+        logger.debug(f"Current chat history: {[msg.content for msg in chat_history]}")
         
         pronoun_pattern = re.compile(r'\b(he|she|it|they)\b', re.IGNORECASE)
         has_pronoun = bool(pronoun_pattern.search(question))
@@ -140,11 +144,11 @@ async def ask_ai(request: Request):
             config={"configurable": {"session_id": conversation_id}}
         )
         
-        logger.info(f"AI response: {response.content}")
+        logger.debug(f"AI response: {response.content}")
         
-        if len(chat_history) > 6:
-            conversation_histories[conversation_id].messages = chat_history[-6:]
-            logger.info(f"Trimmed history to last 6 messages for conversation_id: {conversation_id}")
+        if len(chat_history) > 4:  # Reduced from 6 to save memory
+            conversation_histories[conversation_id].messages = chat_history[-4:]
+            logger.debug(f"Trimmed history to last 4 messages for conversation_id: {conversation_id}")
         
         response_data = {
             "response": response.content,
@@ -155,14 +159,19 @@ async def ask_ai(request: Request):
         
         return JSONResponse(
             content=response_data,
-            headers={...}
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type",
+                "Access-Control-Allow-Credentials": "true",
+            }
         )
         
     except Exception as e:
         logger.error(f"Error processing POST request: {str(e)}\n{traceback.format_exc()}")
         return JSONResponse(
             status_code=500,
-            content={"error": str(e)},
+            content={"error": str(e)},  # Include specific error message
             headers={
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "POST, OPTIONS",
