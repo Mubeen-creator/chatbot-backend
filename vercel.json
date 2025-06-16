@@ -8,13 +8,13 @@
     ],
     "rewrites": [
     {
-      "src": "/ask-ai",
-      "dest": "/main.py",
+      "source": "/ask-ai",
+      "destination": "/main.py",
       "methods": ["POST", "OPTIONS"]
     },
     {
-      "src": "/(.*)",
-      "dest": "/main.py"
+      "source": "/(.*)",
+      "destination": "/main.py"
     }
     ],
     "headers": [
