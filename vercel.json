@@ -6,7 +6,7 @@
       "use": "@vercel/python"
     }
     ],
-    "routes": [
+    "rewrites": [
     {
       "src": "/ask-ai",
       "dest": "/main.py",
