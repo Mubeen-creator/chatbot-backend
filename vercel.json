@@ -1,39 +1,39 @@
 {
     "version": 2,
     "builds": [
-        {
-            "src": "./main.py",
-            "use": "@vercel/python"
-        }
+      {
+        "src": "./main.py",
+        "use": "@vercel/python"
+      }
     ],
-    "routes": [
-        {
-            "src": "/(.*)",
-            "dest": "main.py",
-            "methods": ["GET", "POST", "OPTIONS", "PUT", "DELETE", "PATCH"]
-        }
+    "rewrites": [
+      {
+        "source": "/(.*)",
+        "destination": "main.py"
+      }
     ],
     "headers": [
-        {
-            "source": "/(.*)",
-            "headers": [
-                {
-                    "key": "Access-Control-Allow-Origin",
-                    "value": "http://localhost:3000"
-                },
-                {
-                    "key": "Access-Control-Allow-Methods",
-                    "value": "POST, OPTIONS"
-                },
-                {
-                    "key": "Access-Control-Allow-Headers",
-                    "value": "Content-Type"
-                },
-                {
-                    "key": "Access-Control-Allow-Credentials",
-                    "value": "true"
-                }
-            ]
-        }
+      {
+        "source": "/(.*)",
+        "headers": [
+          {
+            "key": "Access-Control-Allow-Origin",
+            "value": "*"
+          },
+          {
+            "key": "Access-Control-Allow-Methods",
+            "value": "POST, OPTIONS"
+          },
+          {
+            "key": "Access-Control-Allow-Headers",
+            "value": "Content-Type"
+          },
+          {
+            "key": "Access-Control-Allow-Credentials",
+            "value": "true"
+          }
+        ]
+      }
     ]
-}
+  }
+  
