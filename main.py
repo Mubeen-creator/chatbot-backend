@@ -25,7 +25,7 @@ app = FastAPI()
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://chatbot-website-frontend.vercel.app"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["POST", "OPTIONS"],
     allow_headers=["Content-Type"],
@@ -46,7 +46,7 @@ async def log_requests(request: Request, call_next):
             status_code=500,
             content={"error": "Internal server error"},
             headers={
-                "Access-Control-Allow-Origin": request.headers.get("origin", "http://localhost:3000"),
+                "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "POST, OPTIONS",
                 "Access-Control-Allow-Headers": "Content-Type",
                 "Access-Control-Allow-Credentials": "true",
@@ -93,7 +93,7 @@ async def root():
     return JSONResponse(
         content={"message": "Welcome to the AI-powered Personal Assistant!"},
         headers={
-            "Access-Control-Allow-Origin": "http://localhost:3000",
+            "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type",
             "Access-Control-Allow-Credentials": "true",
@@ -115,7 +115,7 @@ async def ask_ai(request: Request):
                 status_code=400,
                 content={"error": "Question is required"},
                 headers={
-                    "Access-Control-Allow-Origin": request.headers.get("origin", "http://localhost:3000"),
+                    "Access-Control-Allow-Origin": "*",
                     "Access-Control-Allow-Methods": "POST, OPTIONS",
                     "Access-Control-Allow-Headers": "Content-Type",
                     "Access-Control-Allow-Credentials": "true",
@@ -166,7 +166,7 @@ async def ask_ai(request: Request):
         return JSONResponse(
             content=response_data,
             headers={
-                "Access-Control-Allow-Origin": request.headers.get("origin", "http://localhost:3000"),
+                "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "POST, OPTIONS",
                 "Access-Control-Allow-Headers": "Content-Type",
                 "Access-Control-Allow-Credentials": "true",
@@ -179,7 +179,7 @@ async def ask_ai(request: Request):
             status_code=500,
             content={"error": str(e)},
             headers={
-                "Access-Control-Allow-Origin": request.headers.get("origin", "http://localhost:3000"),
+                "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "POST, OPTIONS",
                 "Access-Control-Allow-Headers": "Content-Type",
                 "Access-Control-Allow-Credentials": "true",
