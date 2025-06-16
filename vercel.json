@@ -9,8 +9,7 @@
     "rewrites": [
     {
       "source": "/ask-ai",
-      "destination": "/main.py",
-      "methods": ["POST", "OPTIONS"]
+      "destination": "/main.py"
     },
     {
       "source": "/(.*)",
