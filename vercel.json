@@ -1,16 +1,21 @@
 {
     "version": 2,
     "builds": [
-      {
-        "src": "./main.py",
-        "use": "@vercel/python"
-      }
+    {
+      "src": "./main.py",
+      "use": "@vercel/python"
+    }
     ],
-    "rewrites": [
-      {
-        "source": "/(.*)",
-        "destination": "main.py"
-      }
+    "routes": [
+    {
+      "src": "/ask-ai",
+      "dest": "/main.py",
+      "methods": ["POST", "OPTIONS"]
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/main.py"
+    }
     ],
     "headers": [
       {
@@ -35,5 +40,5 @@
         ]
       }
     ]
-  }
+}
   

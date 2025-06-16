@@ -11,6 +11,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
 import asyncio
+import traceback
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -41,7 +42,7 @@ async def log_requests(request: Request, call_next):
         logger.info(f"Response headers: {response.headers}")
         return response
     except Exception as e:
-        logger.error(f"Middleware error: {str(e)}")
+        logger.error(f"Middleware error: {str(e)}\n{traceback.format_exc()}")
         return JSONResponse(
             status_code=500,
             content={"error": "Internal server error"},
@@ -114,12 +115,7 @@ async def ask_ai(request: Request):
             return JSONResponse(
                 status_code=400,
                 content={"error": "Question is required"},
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "POST, OPTIONS",
-                    "Access-Control-Allow-Headers": "Content-Type",
-                    "Access-Control-Allow-Credentials": "true",
-                }
+                headers={...}
             )
 
         logger.info(f"Received question: {question}, conversation_id: {conversation_id}")
@@ -138,12 +134,6 @@ async def ask_ai(request: Request):
         warning = None
         if has_pronoun and not conversation_id and not chat_history:
             warning = "Warning: Pronoun detected but no conversation_id provided."
-        
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
         
         response = await chain_with_history.ainvoke(
             {"question": question},
@@ -165,16 +155,11 @@ async def ask_ai(request: Request):
         
         return JSONResponse(
             content=response_data,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type",
-                "Access-Control-Allow-Credentials": "true",
-            }
+            headers={...}
         )
         
     except Exception as e:
-        logger.error(f"Error processing POST request: {str(e)}")
+        logger.error(f"Error processing POST request: {str(e)}\n{traceback.format_exc()}")
         return JSONResponse(
             status_code=500,
             content={"error": str(e)},
